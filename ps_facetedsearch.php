@@ -234,32 +234,44 @@ class Ps_Facetedsearch extends Module implements WidgetInterface
 
     public function uninstall()
     {
-        /* Delete all configurations */
-        Configuration::deleteByName('PS_LAYERED_CACHE_ENABLED');
-        Configuration::deleteByName('PS_LAYERED_SHOW_QTIES');
-        Configuration::deleteByName('PS_LAYERED_FULL_TREE');
-        Configuration::deleteByName('PS_LAYERED_INDEXED');
-        Configuration::deleteByName('PS_LAYERED_FILTER_PRICE_USETAX');
-        Configuration::deleteByName('PS_LAYERED_FILTER_CATEGORY_DEPTH');
-        Configuration::deleteByName('PS_LAYERED_FILTER_PRICE_ROUNDING');
-        Configuration::deleteByName('PS_LAYERED_FILTER_SHOW_OUT_OF_STOCK_LAST');
-        Configuration::deleteByName('PS_LAYERED_FILTER_BY_DEFAULT_CATEGORY');
+        $configurations = [
+            'PS_LAYERED_CACHE_ENABLED',
+            'PS_LAYERED_SHOW_QTIES',
+            'PS_LAYERED_FULL_TREE',
+            'PS_LAYERED_INDEXED',
+            'PS_LAYERED_FILTER_PRICE_USETAX',
+            'PS_LAYERED_FILTER_CATEGORY_DEPTH',
+            'PS_LAYERED_FILTER_PRICE_ROUNDING',
+            'PS_LAYERED_FILTER_SHOW_OUT_OF_STOCK_LAST',
+            'PS_LAYERED_FILTER_BY_DEFAULT_CATEGORY'
+        ];
 
-        $this->getDatabase()->execute('DROP TABLE IF EXISTS ' . _DB_PREFIX_ . 'layered_category');
-        $this->getDatabase()->execute('DROP TABLE IF EXISTS ' . _DB_PREFIX_ . 'layered_filter');
-        $this->getDatabase()->execute('DROP TABLE IF EXISTS ' . _DB_PREFIX_ . 'layered_filter_block');
-        $this->getDatabase()->execute('DROP TABLE IF EXISTS ' . _DB_PREFIX_ . 'layered_filter_shop');
-        $this->getDatabase()->execute('DROP TABLE IF EXISTS ' . _DB_PREFIX_ . 'layered_indexable_attribute_group');
-        $this->getDatabase()->execute('DROP TABLE IF EXISTS ' . _DB_PREFIX_ . 'layered_indexable_attribute_group_lang_value');
-        $this->getDatabase()->execute('DROP TABLE IF EXISTS ' . _DB_PREFIX_ . 'layered_indexable_attribute_lang_value');
-        $this->getDatabase()->execute('DROP TABLE IF EXISTS ' . _DB_PREFIX_ . 'layered_indexable_feature');
-        $this->getDatabase()->execute('DROP TABLE IF EXISTS ' . _DB_PREFIX_ . 'layered_indexable_feature_lang_value');
-        $this->getDatabase()->execute('DROP TABLE IF EXISTS ' . _DB_PREFIX_ . 'layered_indexable_feature_value_lang_value');
-        $this->getDatabase()->execute('DROP TABLE IF EXISTS ' . _DB_PREFIX_ . 'layered_price_index');
-        $this->getDatabase()->execute('DROP TABLE IF EXISTS ' . _DB_PREFIX_ . 'layered_product_attribute');
+        foreach ($configurations as $configuration) {
+            Configuration::deleteByName($configuration);
+        }
+
+        $tables = [
+            'layered_category',
+            'layered_filter',
+            'layered_filter_block',
+            'layered_filter_shop',
+            'layered_indexable_attribute_group',
+            'layered_indexable_attribute_group_lang_value',
+            'layered_indexable_attribute_lang_value',
+            'layered_indexable_feature',
+            'layered_indexable_feature_lang_value',
+            'layered_indexable_feature_value_lang_value',
+            'layered_price_index',
+            'layered_product_attribute'
+        ];
+
+        foreach ($tables as $table) {
+            $this->getDatabase()->execute('DROP TABLE IF EXISTS ' . _DB_PREFIX_ . $table);
+        }
 
         return parent::uninstall();
     }
+
 
     /**
      * Migrate data from 1.6 equivalent module (if applicable), then uninstall
