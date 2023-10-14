@@ -888,19 +888,29 @@ class Ps_Facetedsearch extends Module implements WidgetInterface
     public function displayLimitPostWarning($count)
     {
         $return = [];
-        if ((ini_get('suhosin.post.max_vars') && ini_get('suhosin.post.max_vars') < $count) || (ini_get('suhosin.request.max_vars') && ini_get('suhosin.request.max_vars') < $count)) {
-            $return['error_type'] = 'suhosin';
-            $return['post.max_vars'] = ini_get('suhosin.post.max_vars');
-            $return['request.max_vars'] = ini_get('suhosin.request.max_vars');
-            $return['needed_limit'] = $count + 100;
-        } elseif (ini_get('max_input_vars') && ini_get('max_input_vars') < $count) {
-            $return['error_type'] = 'conf';
-            $return['max_input_vars'] = ini_get('max_input_vars');
-            $return['needed_limit'] = $count + 100;
+
+        $suhosinPostMaxVars = ini_get('suhosin.post.max_vars');
+        $suhosinRequestMaxVars = ini_get('suhosin.request.max_vars');
+        $maxInputVars = ini_get('max_input_vars');
+
+        if (($suhosinPostMaxVars && $suhosinPostMaxVars < $count) || ($suhosinRequestMaxVars && $suhosinRequestMaxVars < $count)) {
+            $return = [
+                'error_type' => 'suhosin',
+                'post.max_vars' => $suhosinPostMaxVars,
+                'request.max_vars' => $suhosinRequestMaxVars,
+                'needed_limit' => $count + 100,
+            ];
+        } elseif ($maxInputVars && $maxInputVars < $count) {
+            $return = [
+                'error_type' => 'conf',
+                'max_input_vars' => $maxInputVars,
+                'needed_limit' => $count + 100,
+            ];
         }
 
         return $return;
     }
+
 
     private function query($sqlQuery)
     {
