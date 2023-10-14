@@ -1217,92 +1217,95 @@ VALUES(' . $last_id . ', ' . (int) $idShop . ')');
      */
     public function buildLayeredCategories()
     {
+        $db = $this->getDatabase();
+    
         // Get data for all filter templates in the database
-        $templates = $this->getDatabase()->executeS('SELECT * FROM ' . _DB_PREFIX_ . 'layered_filter ORDER BY date_add DESC');
-
+        $templates = $db->executeS('SELECT * FROM ' . _DB_PREFIX_ . 'layered_filter ORDER BY date_add DESC');
+    
         // We will keep track of pages categories where filter was already set, so we don't have multiple
         // filters for the same category and shop.
         $alreadyAssigned = [];
-
+    
         // Clear cache
         $this->invalidateLayeredFilterBlockCache();
-
+    
         // Remove all previous data from layered_category
-        $this->getDatabase()->execute('TRUNCATE ' . _DB_PREFIX_ . 'layered_category');
-
+        $db->execute('TRUNCATE ' . _DB_PREFIX_ . 'layered_category');
+    
         // If no filter templates are defined, nothing else to do here
-        if (!count($templates)) {
+        if (empty($templates)) {
             return true;
         }
-
+    
         // We will insert our queries by batches of hundred queries
         $sqlInsertPrefix = 'INSERT INTO ' . _DB_PREFIX_ . 'layered_category (id_category, controller, id_shop, id_value, type, position, filter_show_limit, filter_type) VALUES ';
-        $sqlInsert = '';
+        $sqlValues = [];
         $nbSqlValuesToInsert = 0;
-
+    
         // Now we will loop through each filter template
         foreach ($templates as $filterTemplate) {
-            // We will get it's data and convert it into array
-            $data = Tools::unSerialize($filterTemplate['filters']);
+            $data = unserialize($filterTemplate['filters']); // Unserialize data
+    
             foreach ($data['shop_list'] as $idShop) {
                 if (!isset($alreadyAssigned[$idShop])) {
                     $alreadyAssigned[$idShop] = [];
                 }
-
-                // Now let's generate data for each controller in the template
+    
                 foreach ($data['controllers'] as $controller) {
-                    // If it's a category controller, we will do it for each category
-                    // Otherwise, we will use just one line with zero
                     $categories = ($controller == 'category' ? $data['categories'] : [0]);
-
+    
                     foreach ($categories as $idCategory) {
-                        $n = 0;
-
-                        // Make unique job name and check if already generated something for this scenario
-                        // If yes, skip it, otherwise note this info for next time
                         $jobName = $controller . '-' . $idCategory;
                         if (in_array($jobName, $alreadyAssigned[$idShop])) {
                             continue;
                         }
                         $alreadyAssigned[$idShop][] = $jobName;
-
+    
+                        $n = 0;
                         foreach ($data as $key => $value) {
                             // The template contains some other data than filters, so we clean it up a bit
                             // All filters begin with layered_selection
-                            if (substr($key, 0, 17) != 'layered_selection') {
+                            if (strpos($key, 'layered_selection') !== 0) {
                                 continue;
                             }
-
+    
                             $type = $value['filter_type'];
                             $limit = $value['filter_show_limit'];
                             ++$n;
-
-                            if ($key == 'layered_selection_stock') {
-                                $sqlInsert .= '(' . (int) $idCategory . ', \'' . $controller . '\', ' . (int) $idShop . ', NULL,\'availability\',' . (int) $n . ', ' . (int) $limit . ', ' . (int) $type . '),';
-                            } elseif ($key == 'layered_selection_subcategories') {
-                                $sqlInsert .= '(' . (int) $idCategory . ', \'' . $controller . '\', ' . (int) $idShop . ', NULL,\'category\',' . (int) $n . ', ' . (int) $limit . ', ' . (int) $type . '),';
-                            } elseif ($key == 'layered_selection_condition') {
-                                $sqlInsert .= '(' . (int) $idCategory . ', \'' . $controller . '\', ' . (int) $idShop . ', NULL,\'condition\',' . (int) $n . ', ' . (int) $limit . ', ' . (int) $type . '),';
-                            } elseif ($key == 'layered_selection_weight_slider') {
-                                $sqlInsert .= '(' . (int) $idCategory . ', \'' . $controller . '\', ' . (int) $idShop . ', NULL,\'weight\',' . (int) $n . ', ' . (int) $limit . ', ' . (int) $type . '),';
-                            } elseif ($key == 'layered_selection_price_slider') {
-                                $sqlInsert .= '(' . (int) $idCategory . ', \'' . $controller . '\', ' . (int) $idShop . ', NULL,\'price\',' . (int) $n . ', ' . (int) $limit . ', ' . (int) $type . '),';
-                            } elseif ($key == 'layered_selection_manufacturer') {
-                                $sqlInsert .= '(' . (int) $idCategory . ', \'' . $controller . '\', ' . (int) $idShop . ', NULL,\'manufacturer\',' . (int) $n . ', ' . (int) $limit . ', ' . (int) $type . '),';
-                            } elseif (substr($key, 0, 21) == 'layered_selection_ag_') {
-                                $sqlInsert .= '(' . (int) $idCategory . ', \'' . $controller . '\', ' . (int) $idShop . ', ' . (int) str_replace('layered_selection_ag_', '', $key) . ',
-    \'id_attribute_group\',' . (int) $n . ', ' . (int) $limit . ', ' . (int) $type . '),';
-                            } elseif (substr($key, 0, 23) == 'layered_selection_feat_') {
-                                $sqlInsert .= '(' . (int) $idCategory . ', \'' . $controller . '\', ' . (int) $idShop . ', ' . (int) str_replace('layered_selection_feat_', '', $key) . ',
-    \'id_feature\',' . (int) $n . ', ' . (int) $limit . ', ' . (int) $type . '),';
+    
+                            switch ($key) {
+                                case 'layered_selection_stock':
+                                    $sqlValues[] = '(' . (int) $idCategory . ', \'' . $controller . '\', ' . (int) $idShop . ', NULL,\'availability\',' . (int) $n . ', ' . (int) $limit . ', ' . (int) $type . ')';
+                                    break;
+                                case 'layered_selection_subcategories':
+                                    $sqlValues[] = '(' . (int) $idCategory . ', \'' . $controller . '\', ' . (int) $idShop . ', NULL,\'category\',' . (int) $n . ', ' . (int) $limit . ', ' . (int) $type . ')';
+                                    break;
+                                case 'layered_selection_condition':
+                                    $sqlValues[] = '(' . (int) $idCategory . ', \'' . $controller . '\', ' . (int) $idShop . ', NULL,\'condition\',' . (int) $n . ', ' . (int) $limit . ', ' . (int) $type . ')';
+                                    break;
+                                case 'layered_selection_weight_slider':
+                                    $sqlValues[] = '(' . (int) $idCategory . ', \'' . $controller . '\', ' . (int) $idShop . ', NULL,\'weight\',' . (int) $n . ', ' . (int) $limit . ', ' . (int) $type . ')';
+                                    break;
+                                case 'layered_selection_price_slider':
+                                    $sqlValues[] = '(' . (int) $idCategory . ', \'' . $controller . '\', ' . (int) $idShop . ', NULL,\'price\',' . (int) $n . ', ' . (int) $limit . ', ' . (int) $type . ')';
+                                    break;
+                                case 'layered_selection_manufacturer':
+                                    $sqlValues[] = '(' . (int) $idCategory . ', \'' . $controller . '\', ' . (int) $idShop . ', NULL,\'manufacturer\',' . (int) $n . ', ' . (int) $limit . ', ' . (int) $type . ')';
+                                    break;
+                                default:
+                                    if (preg_match('/layered_selection_ag_(\d+)/', $key, $matches)) {
+                                        $sqlValues[] = '(' . (int) $idCategory . ', \'' . $controller . '\', ' . (int) $idShop . ', ' . (int) $matches[1] . ', \'id_attribute_group\',' . (int) $n . ', ' . (int) $limit . ', ' . (int) $type . ')';
+                                    } elseif (preg_match('/layered_selection_feat_(\d+)/', $key, $matches)) {
+                                        $sqlValues[] = '(' . (int) $idCategory . ', \'' . $controller . '\', ' . (int) $idShop . ', ' . (int) $matches[1] . ', \'id_feature\',' . (int) $n . ', ' . (int) $limit . ', ' . (int) $type . ')';
+                                    }
                             }
-
+    
                             ++$nbSqlValuesToInsert;
-
+    
                             // If we reached the limit, we will execute it and flush our "cache"
                             if ($nbSqlValuesToInsert >= 100) {
-                                $this->getDatabase()->execute($sqlInsertPrefix . rtrim($sqlInsert, ','));
-                                $sqlInsert = '';
+                                $db->execute($sqlInsertPrefix . implode(',', $sqlValues));
+                                $sqlValues = [];
                                 $nbSqlValuesToInsert = 0;
                             }
                         }
@@ -1310,12 +1313,13 @@ VALUES(' . $last_id . ', ' . (int) $idShop . ')');
                 }
             }
         }
-
+    
         // We will execute remaining queries because we almost certainly didn't reach 100 in the batch
         if ($nbSqlValuesToInsert) {
-            $this->getDatabase()->execute($sqlInsertPrefix . rtrim($sqlInsert, ','));
+            $db->execute($sqlInsertPrefix . implode(',', $sqlValues));
         }
     }
+    
 
     /**
      * Render template
@@ -1595,37 +1599,38 @@ VALUES(' . $last_id . ', ' . (int) $idShop . ')');
         $db = $this->getDatabase();
         
         $query = 'SELECT p.`id_product`
-                  FROM `' . _DB_PREFIX_ . 'product` p
-                  INNER JOIN `' . _DB_PREFIX_ . 'product_shop` ps
-                  ON (ps.`id_product` = p.`id_product` AND ps.`active` = 1 AND ps.`visibility` IN ("both", "catalog"))
-                  WHERE';
-    
-       if ($full) {
-           $query .= ' p.`id_product` > :cursor';
-       } else {
-           $query .= ' NOT EXISTS (
-                         SELECT 1 FROM `' . _DB_PREFIX_ . 'layered_price_index` psi 
-                         WHERE psi.id_product = p.id_product
-                     )';
-       }
-    
-       $query .= ' GROUP BY p.`id_product`
-                   ORDER BY p.`id_product`
-                   LIMIT :length OFFSET 0';
-    
-       $params = [
-           ':cursor' => (int) $cursor,
-           ':length' => (int) $length
-       ];
-    
-       $lastIdProduct = 0;
-       foreach ($db->executeS($query, $params) as $product) {
-           $this->indexProductPrices((int) $product['id_product'], ($smart && $full));
-           $lastIdProduct = $product['id_product'];
-       }
-    
-       return (int) $lastIdProduct;
+                FROM `' . _DB_PREFIX_ . 'product` p
+                INNER JOIN `' . _DB_PREFIX_ . 'product_shop` ps
+                ON (ps.`id_product` = p.`id_product` AND ps.`active` = 1 AND ps.`visibility` IN ("both", "catalog"))
+                WHERE';
+
+        if ($full) {
+            $query .= ' p.`id_product` > :cursor';
+        } else {
+            $query .= ' NOT EXISTS (
+                            SELECT 1 FROM `' . _DB_PREFIX_ . 'layered_price_index` psi 
+                            WHERE psi.id_product = p.id_product
+                        )';
+        }
+
+        $query .= ' GROUP BY p.`id_product`
+                    ORDER BY p.`id_product`
+                    LIMIT :length OFFSET 0';
+
+        $params = [
+            ':cursor' => (int) $cursor,
+            ':length' => (int) $length
+        ];
+
+        $lastIdProduct = 0;
+        foreach ($db->executeS($query, $params) as $product) {
+            $this->indexProductPrices((int) $product['id_product'], ($smart && $full));
+            $lastIdProduct = $product['id_product'];
+        }
+
+        return (int) $lastIdProduct;
     }
+
 
     /**
      * {@inheritdoc}
