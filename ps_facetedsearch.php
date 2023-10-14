@@ -1592,32 +1592,39 @@ VALUES(' . $last_id . ', ' . (int) $idShop . ')');
      */
     private function indexPricesUnbreakable($cursor, $full = false, $smart = false, $length = 100)
     {
-        if ($full) {
-            $query = 'SELECT p.`id_product` ' .
-                'FROM `' . _DB_PREFIX_ . 'product` p ' .
-                'INNER JOIN `' . _DB_PREFIX_ . 'product_shop` ps ' .
-                'ON (ps.`id_product` = p.`id_product` AND ps.`active` = 1 AND ps.`visibility` IN ("both", "catalog")) ' .
-                'WHERE p.id_product > ' . (int) $cursor . ' ' .
-                'GROUP BY p.`id_product` ' .
-                'ORDER BY p.`id_product` LIMIT 0,' . (int) $length;
-        } else {
-            $query = 'SELECT p.`id_product` ' .
-                'FROM `' . _DB_PREFIX_ . 'product` p ' .
-                'INNER JOIN `' . _DB_PREFIX_ . 'product_shop` ps ' .
-                'ON (ps.`id_product` = p.`id_product` AND ps.`active` = 1 AND ps.`visibility` IN ("both", "catalog")) ' .
-                'LEFT JOIN  `' . _DB_PREFIX_ . 'layered_price_index` psi ON (psi.id_product = p.id_product) ' .
-                'WHERE psi.id_product IS NULL ' .
-                'GROUP BY p.`id_product` ' .
-                'ORDER BY p.`id_product` LIMIT 0,' . (int) $length;
-        }
-
-        $lastIdProduct = 0;
-        foreach ($this->getDatabase()->executeS($query) as $product) {
-            $this->indexProductPrices((int) $product['id_product'], ($smart && $full));
-            $lastIdProduct = $product['id_product'];
-        }
-
-        return (int) $lastIdProduct;
+        $db = $this->getDatabase();
+        
+        $query = 'SELECT p.`id_product`
+                  FROM `' . _DB_PREFIX_ . 'product` p
+                  INNER JOIN `' . _DB_PREFIX_ . 'product_shop` ps
+                  ON (ps.`id_product` = p.`id_product` AND ps.`active` = 1 AND ps.`visibility` IN ("both", "catalog"))
+                  WHERE';
+    
+       if ($full) {
+           $query .= ' p.`id_product` > :cursor';
+       } else {
+           $query .= ' NOT EXISTS (
+                         SELECT 1 FROM `' . _DB_PREFIX_ . 'layered_price_index` psi 
+                         WHERE psi.id_product = p.id_product
+                     )';
+       }
+    
+       $query .= ' GROUP BY p.`id_product`
+                   ORDER BY p.`id_product`
+                   LIMIT :length OFFSET 0';
+    
+       $params = [
+           ':cursor' => (int) $cursor,
+           ':length' => (int) $length
+       ];
+    
+       $lastIdProduct = 0;
+       foreach ($db->executeS($query, $params) as $product) {
+           $this->indexProductPrices((int) $product['id_product'], ($smart && $full));
+           $lastIdProduct = $product['id_product'];
+       }
+    
+       return (int) $lastIdProduct;
     }
 
     /**
