@@ -301,26 +301,26 @@ class Ps_Facetedsearch extends Module implements WidgetInterface
      */
     public function indexAttributes($idProduct = null)
     {
+        $db = $this->getDatabase();
+    
         if (null === $idProduct) {
-            $this->getDatabase()->execute('TRUNCATE ' . _DB_PREFIX_ . 'layered_product_attribute');
+            $db->execute('TRUNCATE ' . _DB_PREFIX_ . 'layered_product_attribute');
         } else {
-            $this->getDatabase()->execute(
-                'DELETE FROM ' . _DB_PREFIX_ . 'layered_product_attribute
-                WHERE id_product = ' . (int) $idProduct
+            $db->execute(
+                'REPLACE INTO `' . _DB_PREFIX_ . 'layered_product_attribute` (`id_attribute`, `id_product`, `id_attribute_group`, `id_shop`)
+                SELECT pac.id_attribute, pa.id_product, ag.id_attribute_group, product_attribute_shop.`id_shop`
+                FROM ' . _DB_PREFIX_ . 'product_attribute pa' .
+                Shop::addSqlAssociation('product_attribute', 'pa') . '
+                INNER JOIN ' . _DB_PREFIX_ . 'product_attribute_combination pac ON pac.id_product_attribute = pa.id_product_attribute
+                INNER JOIN ' . _DB_PREFIX_ . 'attribute a ON (a.id_attribute = pac.id_attribute)
+                INNER JOIN ' . _DB_PREFIX_ . 'attribute_group ag ON ag.id_attribute_group = a.id_attribute_group
+                WHERE pa.id_product = :idProduct
+                GROUP BY a.id_attribute, pa.id_product , product_attribute_shop.`id_shop`',
+                [':idProduct' => (int) $idProduct]
             );
         }
-
-        return $this->getDatabase()->execute(
-            'INSERT INTO `' . _DB_PREFIX_ . 'layered_product_attribute` (`id_attribute`, `id_product`, `id_attribute_group`, `id_shop`)
-            SELECT pac.id_attribute, pa.id_product, ag.id_attribute_group, product_attribute_shop.`id_shop`
-            FROM ' . _DB_PREFIX_ . 'product_attribute pa' .
-            Shop::addSqlAssociation('product_attribute', 'pa') . '
-            INNER JOIN ' . _DB_PREFIX_ . 'product_attribute_combination pac ON pac.id_product_attribute = pa.id_product_attribute
-            INNER JOIN ' . _DB_PREFIX_ . 'attribute a ON (a.id_attribute = pac.id_attribute)
-            INNER JOIN ' . _DB_PREFIX_ . 'attribute_group ag ON ag.id_attribute_group = a.id_attribute_group
-            ' . ($idProduct === null ? '' : 'AND pa.id_product = ' . (int) $idProduct) . '
-            GROUP BY a.id_attribute, pa.id_product , product_attribute_shop.`id_shop`'
-        );
+    
+        return true; // or any other result if needed
     }
 
     /*
