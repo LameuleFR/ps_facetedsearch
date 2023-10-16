@@ -352,23 +352,18 @@ class SearchProvider implements FacetsRendererInterface, ProductSearchProviderIn
     {
         $facetCollection = $result->getFacetCollection();
 
-        // not all search providers generate menus
         if (empty($facetCollection)) {
             return null;
         }
 
-        $facetsVar = array_map(
-            [$this, 'prepareFacetForTemplate'],
-            $facetCollection->getFacets()
-        );
+        $facetsVar = array_map([$this, 'prepareFacetForTemplate'], $facetCollection->getFacets());
 
-        $displayedFacets = [];
         $activeFilters = [];
         foreach ($facetsVar as $idx => $facet) {
             // Remove undisplayed facets
-            if (!empty($facet['displayed'])) {
-                $displayedFacets[] = $facet;
-            }
+            $displayedFacets = array_filter($facetsVar, function ($facet) {
+                return !empty($facet['displayed']);
+            });
 
             // Check if a filter is active
             foreach ($facet['filters'] as $filter) {
@@ -379,11 +374,12 @@ class SearchProvider implements FacetsRendererInterface, ProductSearchProviderIn
         }
 
         return [
-            $activeFilters,
-            $displayedFacets,
-            $facetsVar,
+            'activeFilters' => $activeFilters,
+            'displayedFacets' => $displayedFacets,
+            'facetsVar' => $facetsVar,
         ];
     }
+
 
     /**
      * Converts a Facet to an array with all necessary
