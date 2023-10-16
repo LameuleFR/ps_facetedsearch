@@ -569,34 +569,17 @@ class SearchProvider implements FacetsRendererInterface, ProductSearchProviderIn
      */
     private function updateQueryString(array $extraParams = [])
     {
-        $uriWithoutParams = explode('?', $_SERVER['REQUEST_URI'])[0];
+        $uriParts = explode('?', $_SERVER['REQUEST_URI']);
+        $uriWithoutParams = $uriParts[0];
         $url = Tools::getCurrentUrlProtocolPrefix() . $_SERVER['HTTP_HOST'] . $uriWithoutParams;
-        $params = [];
-        $paramsFromUri = '';
-        if (strpos($_SERVER['REQUEST_URI'], '?') !== false) {
-            $paramsFromUri = explode('?', $_SERVER['REQUEST_URI'])[1];
-        }
-        parse_str($paramsFromUri, $params);
 
-        foreach ($extraParams as $key => $value) {
-            if (null === $value) {
-                // Force clear param if null value is passed
-                unset($params[$key]);
-            } else {
-                $params[$key] = $value;
-            }
-        }
+        parse_str($uriParts[1] ?? '', $params);
 
-        foreach ($params as $key => $param) {
-            if (null === $param || '' === $param) {
-                unset($params[$key]);
-            }
-        }
-
-        $queryString = str_replace('%2F', '/', http_build_query($params, '', '&'));
+        $queryString = http_build_query(array_merge($params, $extraParams), '', '&');
 
         return $url . ($queryString ? "?$queryString" : '');
     }
+
 
     /**
      * Checks if we should return information about combinations to the core
