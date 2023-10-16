@@ -392,21 +392,23 @@ class SearchProvider implements FacetsRendererInterface, ProductSearchProviderIn
     protected function prepareFacetForTemplate(Facet $facet)
     {
         $facetsArray = $facet->toArray();
+        $facetLabel = $facet->getLabel();
+        $widgetType = $facet->getWidgetType();
+    
         foreach ($facetsArray['filters'] as &$filter) {
-            $filter['facetLabel'] = $facet->getLabel();
-            if ($filter['nextEncodedFacets'] || $facet->getWidgetType() === 'slider') {
+            $filter['facetLabel'] = $facetLabel;
+    
+            if ($filter['nextEncodedFacets'] || $widgetType === 'slider') {
                 $filter['nextEncodedFacetsURL'] = $this->updateQueryString([
                     'q' => $filter['nextEncodedFacets'],
                     'page' => null,
                 ]);
             } else {
-                $filter['nextEncodedFacetsURL'] = $this->updateQueryString([
-                    'q' => null,
-                ]);
+                $filter['nextEncodedFacetsURL'] = $this->updateQueryString(['q' => null]);
             }
         }
         unset($filter);
-
+    
         return $facetsArray;
     }
 
