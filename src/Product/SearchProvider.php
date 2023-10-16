@@ -422,6 +422,8 @@ class SearchProvider implements FacetsRendererInterface, ProductSearchProviderIn
     private function labelRangeFilters(array $facets)
     {
         $context = $this->module->getContext();
+        $currentLocale = $context->getCurrentLocale();
+        $currencyIsoCode = $context->currency->iso_code;
 
         foreach ($facets as $facet) {
             if (!in_array($facet->getType(), Filters\Converter::RANGE_FILTERS)) {
@@ -432,29 +434,35 @@ class SearchProvider implements FacetsRendererInterface, ProductSearchProviderIn
                 $filterValue = $filter->getValue();
                 $min = empty($filterValue[0]) ? $facet->getProperty('min') : $filterValue[0];
                 $max = empty($filterValue[1]) ? $facet->getProperty('max') : $filterValue[1];
-                if ($facet->getType() === 'weight') {
-                    $unit = Configuration::get('PS_WEIGHT_UNIT');
-                    $filter->setLabel(
-                        sprintf(
-                            '%1$s %2$s - %3$s %4$s',
-                            $context->getCurrentLocale()->formatNumber($min),
-                            $unit,
-                            $context->getCurrentLocale()->formatNumber($max),
-                            $unit
-                        )
-                    );
-                } elseif ($facet->getType() === 'price') {
-                    $filter->setLabel(
-                        sprintf(
-                            '%1$s - %2$s',
-                            $context->getCurrentLocale()->formatPrice($min, $context->currency->iso_code),
-                            $context->getCurrentLocale()->formatPrice($max, $context->currency->iso_code)
-                        )
-                    );
+
+                switch ($facet->getType()) {
+                    case 'weight':
+                        $unit = Configuration::get('PS_WEIGHT_UNIT');
+                        $filter->setLabel(
+                            sprintf(
+                                '%1$s %2$s - %3$s %4$s',
+                                $currentLocale->formatNumber($min),
+                                $unit,
+                                $currentLocale->formatNumber($max),
+                                $unit
+                            )
+                        );
+                        break;
+
+                    case 'price':
+                        $filter->setLabel(
+                            sprintf(
+                                '%1$s - %2$s',
+                                $currentLocale->formatPrice($min, $currencyIsoCode),
+                                $currentLocale->formatPrice($max, $currencyIsoCode)
+                            )
+                        );
+                        break;
                 }
             }
         }
     }
+
 
     /**
      * This method generates a URL stub for each filter inside the given facets
@@ -523,17 +531,15 @@ class SearchProvider implements FacetsRendererInterface, ProductSearchProviderIn
     private function hideUselessFacets(array $facets, $totalProducts)
     {
         foreach ($facets as $facet) {
-            // If the facet is a slider type, we hide it ONLY if the MIN and MAX value match
             if ($facet->getWidgetType() === 'slider') {
-                $facet->setDisplayed(
-                    $facet->getProperty('min') != $facet->getProperty('max')
-                );
+                // If the facet is a slider type, we hide it ONLY if the MIN and MAX value match
+                $facet->setDisplayed($facet->getProperty('min') != $facet->getProperty('max'));
                 continue;
             }
 
-            // Now the rest of facets - we apply this logic
             $totalFacetProducts = 0;
             $usefulFiltersCount = 0;
+
             foreach ($facet->getFilters() as $filter) {
                 if ($filter->getMagnitude() > 0 && $filter->isDisplayed()) {
                     $totalFacetProducts += $filter->getMagnitude();
@@ -543,22 +549,19 @@ class SearchProvider implements FacetsRendererInterface, ProductSearchProviderIn
 
             // We display the facet in several cases
             $facet->setDisplayed(
-                // If there are two filters available
-                $usefulFiltersCount > 1
-                ||
-                // There is only one filter available, but it furhter reduces the product selection
+                $usefulFiltersCount > 1 ||
                 (
-                    count($facet->getFilters()) === 1
-                    && $totalFacetProducts < $totalProducts
-                    && $usefulFiltersCount > 0
+                    count($facet->getFilters()) === 1 &&
+                    (
+                        $totalFacetProducts < $totalProducts ||
+                        $facet->getType() == 'availability'
+                    )
                 )
-                ||
-                // If there is only one filter, but it's availability filter - we want this one to be displayed all the time
-                ($usefulFiltersCount === 1 && $facet->getType() == 'availability')
             );
             // Other cases - hidden by default
         }
     }
+
 
     /**
      * Generate a URL corresponding to the current page but
